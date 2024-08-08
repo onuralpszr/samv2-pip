@@ -1,0 +1,59 @@
+name: Build and Upload to PyPI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+        os: [ubuntu-latest]
+        enable-cuda: [1]
+        method: [network]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+    
+      - name: Checkout code
+        uses: Jimver/cuda-toolkit@v0.2.16
+        id: cuda-toolkit
+        with:
+            cuda: '12.5.0'
+            method: ${{matrix.method}}
+            sub-packages: '["nvcc"]'
+            non-cuda-sub-packages: '["libcublas"]'
+            log-file-suffix: 'nvcc-libcublas-${{matrix.method}}-${{matrix.os}}'
+  
+        
+      - name: Check CUDA version
+        run: |
+            echo "Installed cuda version is: ${{steps.cuda-toolkit.outputs.cuda}}"
+
+      - name: Check CUDA path
+        run: |
+            echo "Cuda install location: ${{steps.cuda-toolkit.outputs.CUDA_PATH}}"
+
+      - name: Check nvcc version
+        run: nvcc -V
+
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel torch
+
+      - name: Build .whl file
+        run: |
+          export SAM2_BUILD_CUDA=${{ matrix.enable-cuda }}
+          python setup.py sdist bdist_wheel
+
